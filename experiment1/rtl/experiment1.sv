@@ -30,11 +30,14 @@ parameter	MAX_1kHz_div_count = 24999;
 
 logic resetn;
 
-enum logic [1:0] {
+enum logic [2:0] {
 	S_IDLE,
 	S_PB0_ONCE,
 	S_PB0_TWICE,
-	S_PB0_DISPLAY
+	S_PB0_DISPLAY,
+	S_PB1_ONCE,
+	S_PB1_TWICE,
+	S_PB1_DISPLAY
 } state;
 
 logic [15:0] clock_1kHz_div_count;
@@ -123,6 +126,9 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			if (PB_detected[0] == 1'b1) begin
 				state <= S_PB0_ONCE;
 			end
+			if (PB_detected[1] == 1'b1) begin
+				state <= S_PB1_ONCE;
+			end
 		end
 		S_PB0_ONCE: begin
 			if (PB_detected[0] == 1'b1) state <= S_PB0_TWICE;
@@ -137,7 +143,28 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 					state <= S_IDLE;
 		end
 		S_PB0_DISPLAY: begin
-			if (PB_detected[1] || PB_detected[2] || PB_detected[3]) 
+			if (PB_detected[2] || PB_detected[3]) 
+				state <= S_IDLE;
+			if (PB_detected[1])
+				state <= S_PB1_ONCE;
+		end
+		
+		//Button 1
+		
+		S_PB1_ONCE: begin
+			if (PB_detected[1] == 1'b1) state <= S_PB1_TWICE;
+			else 
+				if (PB_detected[0] || PB_detected[2] || PB_detected[3]) 
+					state <= S_IDLE;
+		end
+		S_PB1_TWICE: begin
+			if (PB_detected[1] == 1'b1) state <= S_PB1_DISPLAY;			
+			else 
+				if (PB_detected[0] || PB_detected[2] || PB_detected[3]) 
+					state <= S_IDLE;
+		end
+		S_PB1_DISPLAY: begin
+			if (PB_detected[0] || PB_detected[2] || PB_detected[3]) 
 				state <= S_IDLE;
 		end
 		endcase

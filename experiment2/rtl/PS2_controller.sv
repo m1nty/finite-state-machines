@@ -36,8 +36,6 @@ logic [7:0] PS2_shift_reg;
 logic [2:0] PS2_bit_count;
 logic PS2_parity;
 
-assign PS2_make_code = 1'b1;
-
 always_ff @ (posedge Clock_50 or negedge Resetn) begin
 	if (Resetn == 1'b0) begin
 		PS2_clock_buf <= 1'b0;	
@@ -48,6 +46,7 @@ always_ff @ (posedge Clock_50 or negedge Resetn) begin
 		PS2_code <= 8'd0;
 		PS2_parity <= 1'b0;
 		PS2_shift_reg <= 8'd0;
+		PS2_make_code <= 1'b1;
 	end else begin
 		// Synchronize the data
 		PS2_clock_sync <= PS2_clock;
@@ -82,10 +81,16 @@ always_ff @ (posedge Clock_50 or negedge Resetn) begin
 			S_PS2_STOP: begin
 				if (PS2_data == 1'b1) begin
 					// Stop bit detected
+					// Check for make or break code
+					if (PS2_code == 8'hF0 || PS2_shift_reg == 8'hF0) 
+						PS2_make_code <= 1'b0;
+					else 
+						PS2_make_code <= 1'b1;
+												
 					PS2_code <= PS2_shift_reg;
 					PS2_code_ready <= 1'b1;
 				end
-				PS2_state <= S_PS2_IDLE;				
+				PS2_state <= S_PS2_IDLE;
 			end
 			default: PS2_state <= S_PS2_IDLE;
 			endcase
