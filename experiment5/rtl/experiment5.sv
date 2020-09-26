@@ -124,8 +124,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		LCD_line <= 1'b0;
 		PS2_code_ready_buf <= 1'b0;
 		LCD_position <= 4'h0;
-		
-		data_counter <= 4'd0;
+		data_counter <= 2'd0;
 		data_reg[15] <= 8'h00;
 		data_reg[14] <= 8'h00;
 		data_reg[13] <= 8'h00;
@@ -133,11 +132,11 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		data_reg[11] <= 8'h00;
 		data_reg[10] <= 8'h00;
 		data_reg[9] <= 8'h00;
-		data_reg[8] <= 8'h00;
+		data_reg[8] <= 8'h00;	
 		data_reg[7] <= 8'h00;
 		data_reg[6] <= 8'h00;
 		data_reg[5] <= 8'h00;
-		data_reg[4] <= 8'h00;
+		data_reg[4] <= 8'h00;	
 		data_reg[3] <= 8'h00;
 		data_reg[2] <= 8'h00;
 		data_reg[1] <= 8'h00;
@@ -221,7 +220,6 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				if (LCD_done == 1'b1) begin			
 					if (LCD_position < 4'd15) begin
 						LCD_position <= LCD_position + 4'h1;
-						
 						if (data_counter < 4'd15) begin
 							data_counter <= data_counter + 2'd1;
 
