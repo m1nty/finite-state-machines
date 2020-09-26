@@ -10,7 +10,7 @@ configure wave -timelineunits us
 add wave -divider -height 20 {board inputs/outputs}
 add wave -bin UUT/CLOCK_50_I
 add wave -hex UUT/SWITCH_I
-# add wave -hex UUT/SEVEN_SEGMENT_N_O
+add wave -hex UUT/SEVEN_SEGMENT_N_O
 # add wave -hex UUT/LED_GREEN_O
 # add wave -hex UUT/LED_RED_O
 add wave -bin UUT/PS2_DATA_I

@@ -140,7 +140,8 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		data_reg[3] <= 8'h00;
 		data_reg[2] <= 8'h00;
 		data_reg[1] <= 8'h00;
-		data_reg[0] <= 8'h00;		
+		data_reg[0] <= 8'h00;
+		
 	end else begin
 		PS2_code_ready_buf <= PS2_code_ready;		
 
