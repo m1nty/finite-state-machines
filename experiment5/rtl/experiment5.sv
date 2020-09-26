@@ -54,9 +54,9 @@ enum logic [3:0] {
 	S_LCD_FINISH_CHANGE_LINE
 } state;
 
-logic [1:0] data_counter;
+logic [3:0] data_counter;
 
-logic [7:0] data_reg [3:0];
+logic [7:0] data_reg [15:0];
 
 logic [7:0] PS2_code;
 logic PS2_code_ready, PS2_code_ready_buf;
@@ -124,11 +124,25 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		LCD_line <= 1'b0;
 		PS2_code_ready_buf <= 1'b0;
 		LCD_position <= 4'h0;
-		data_counter <= 2'd0;
+		
+		data_counter <= 4'd0;
+		data_reg[15] <= 8'h00;
+		data_reg[14] <= 8'h00;
+		data_reg[13] <= 8'h00;
+		data_reg[12] <= 8'h00;
+		data_reg[11] <= 8'h00;
+		data_reg[10] <= 8'h00;
+		data_reg[9] <= 8'h00;
+		data_reg[8] <= 8'h00;
+		data_reg[7] <= 8'h00;
+		data_reg[6] <= 8'h00;
+		data_reg[5] <= 8'h00;
+		data_reg[4] <= 8'h00;
 		data_reg[3] <= 8'h00;
 		data_reg[2] <= 8'h00;
 		data_reg[1] <= 8'h00;
-		data_reg[0] <= 8'h00;		
+		data_reg[0] <= 8'h00;
+		
 	end else begin
 		PS2_code_ready_buf <= PS2_code_ready;		
 
@@ -164,7 +178,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		S_IDLE: begin
 			// Scan code is detected
 			if (PS2_code_ready && ~PS2_code_ready_buf && PS2_make_code == 1'b1) begin
-				if (data_counter < 2'd3) begin
+				if (data_counter < 4'd15) begin
 					data_counter <= data_counter + 2'd1;
 				end else begin
 					// Send the 4 data to LCD
@@ -172,6 +186,18 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 					state <= S_LCD_WAIT_ROM_UPDATE;
 				end
 				// Load the PS2 code to shift registers
+				data_reg[15] <= data_reg[14];
+				data_reg[14] <= data_reg[13];
+				data_reg[13] <= data_reg[12];
+				data_reg[12] <= data_reg[11];
+				data_reg[11] <= data_reg[10];
+				data_reg[10] <= data_reg[9];
+				data_reg[9] <= data_reg[8];
+				data_reg[8] <= data_reg[7];
+				data_reg[7] <= data_reg[6];
+				data_reg[6] <= data_reg[5];
+				data_reg[5] <= data_reg[4];
+				data_reg[4] <= data_reg[3];
 				data_reg[3] <= data_reg[2];
 				data_reg[2] <= data_reg[1];
 				data_reg[1] <= data_reg[0];
@@ -195,7 +221,8 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				if (LCD_done == 1'b1) begin			
 					if (LCD_position < 4'd15) begin
 						LCD_position <= LCD_position + 4'h1;
-						if (data_counter < 2'd3) begin
+						
+						if (data_counter < 4'd15) begin
 							data_counter <= data_counter + 2'd1;
 
 							state <= S_LCD_WAIT_ROM_UPDATE;
@@ -209,6 +236,18 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 						LCD_position <= 4'h0;
 						state <= S_LCD_ISSUE_CHANGE_LINE;
 					end
+					data_reg[15] <= data_reg[14];
+					data_reg[14] <= data_reg[13];
+					data_reg[13] <= data_reg[12];
+					data_reg[12] <= data_reg[11];
+					data_reg[11] <= data_reg[10];
+					data_reg[10] <= data_reg[9];
+					data_reg[9] <= data_reg[8];
+					data_reg[8] <= data_reg[7];
+					data_reg[7] <= data_reg[6];
+					data_reg[6] <= data_reg[5];
+					data_reg[5] <= data_reg[4];
+					data_reg[4] <= data_reg[3];
 					data_reg[3] <= data_reg[2];
 					data_reg[2] <= data_reg[1];
 					data_reg[1] <= data_reg[0];
@@ -228,7 +267,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				LCD_start <= 1'b0;
 			end else begin	
 				if (LCD_done == 1'b1) begin	
-					if (data_counter < 2'd3) begin
+					if (data_counter < 4'd15) begin
 						data_counter <= data_counter + 2'd1;
 							
 						state <= S_LCD_WAIT_ROM_UPDATE;
