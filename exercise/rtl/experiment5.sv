@@ -47,17 +47,18 @@ enum logic [3:0] {
 	S_LCD_INIT,
 	S_LCD_INIT_WAIT,
 	S_IDLE,
+	S_REPEAT,
 	S_LCD_WAIT_ROM_UPDATE,
 	S_LCD_ISSUE_INSTRUCTION,
 	S_LCD_FINISH_INSTRUCTION,
 	S_LCD_ISSUE_CHANGE_LINE,
-	S_LCD_FINISH_CHANGE_LINE
+	S_LCD_FINISH_CHANGE_LINE,
+	S_DELAY
 } state;
 
-logic [3:0] data_counter;
+logic [4:0] data_counter;
 
 logic [7:0] data_reg [15:0];
-
 logic [7:0] PS2_code;
 logic PS2_code_ready, PS2_code_ready_buf;
 logic PS2_make_code;
@@ -75,10 +76,22 @@ logic LCD_done;
 logic [6:0] value_7_segment[2:0];
 
 logic case_flag;
-logic [8:0]address;
+logic [8:0]address;//used for debugging, displays current address from rom
 assign resetn = ~SWITCH_I[17];
+
+logic [15:0]caps_check;//keeps track of which characters are capitals
+logic [3:0]repeat_count;//counts letters repeated from the top line
+
+logic repeat_delay;//flags to control counting of repeated character from top line 
+logic [6:0]seven_seg;
+logic mode;//keeps track of whether printing one character at a time
+logic [7:0]display;//PS2 code to be displayed
+logic [7:0]top_line;//PS2 code of character on the top line
+logic flag;
+logic last_letter;
 logic readyup;
 logic readydown;
+logic [6:0]delay_counter;//counter to add 1us delay after bottom row is displayed 
 // PS2 unit
 PS2_controller PS2_unit (
 	.Clock_50(CLOCK_50_I),
@@ -94,7 +107,7 @@ PS2_controller PS2_unit (
 
 // ROM for translate PS2 code to LCD code
 PS2_to_LCD_ROM	PS2_to_LCD_ROM_inst (
-	.address ( {case_flag, data_reg[0]} ),
+	.address ( {caps_check[data_counter], display} ),//gets the LCD code, caps_check used to determine if letter is capital or not
 	.clock ( CLOCK_50_I ),
 	.q ( LCD_code )
 	);
@@ -128,6 +141,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		PS2_code_ready_buf <= 1'b0;
 		LCD_position <= 4'h0;
 		data_counter <= 2'd0;
+		
 		data_reg[15] <= 8'h00;
 		data_reg[14] <= 8'h00;
 		data_reg[13] <= 8'h00;
@@ -144,10 +158,23 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		data_reg[2] <= 8'h00;
 		data_reg[1] <= 8'h00;
 		data_reg[0] <= 8'h00;
+		
 		case_flag <= 1'b0;
 		address <= 9'b0;
+
+		repeat_count <= 1'b0;
+
+		repeat_delay <= 1'b0;
+		caps_check <= 16'b0;
+		display <= 8'b0;
+		mode <= 1'b0;
+		top_line <= 7'b0;
+		flag <= 1'b0;
+		
+		last_letter <= 1'b0;
 		readyup <= 1'b0;
 		readydown <= 1'b0;
+		delay_counter <= 1'b0;
 	end else begin
 		PS2_code_ready_buf <= PS2_code_ready;		
 
@@ -182,51 +209,68 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 		end
 		S_IDLE: begin
 			// Scan code is detected
-			address <=  {case_flag, data_reg[0]};
-			if (PS2_code_ready && ~PS2_code_ready_buf && PS2_make_code == 1'b1) begin
-				
-				if(PS2_code == 8'h12) begin
-					readyup <= 1'b1;
-					readydown <= 1'b0;
-				end else if(PS2_code == 8'h59)begin 
-					readydown <= 1'b1;
-					readyup <= 1'b0;
-				end else begin
-					if(readyup == 1'b1) begin
-						readyup <= 1'b0;
-						case_flag <= 1'b1;
-					end else if(readydown == 1'b1) begin
+			if (LCD_start == 1'b1) begin
+				LCD_start <= 1'b0;
+			end else begin
+				if (PS2_code_ready && ~PS2_code_ready_buf && PS2_make_code == 1'b1) begin
+					
+					if(PS2_code == 8'h12) begin//logic to check whether left or right shift pressed
+						readyup <= 1'b1;
 						readydown <= 1'b0;
-						case_flag <= 1'b0;
-					end
-				
-					if (data_counter < 4'd15) begin
-						data_counter <= data_counter + 2'd1;
+					end else if(PS2_code == 8'h59)begin 
+						readydown <= 1'b1;	
+						readyup <= 1'b0;
+						
+						
 					end else begin
-						// Send the 4 data to LCD
-						data_counter <= 2'd0;
-						state <= S_LCD_WAIT_ROM_UPDATE;
+					
+					
+						if(readyup == 1'b1)
+							case_flag <= 1'b1;
+						else if(readydown == 1'b1)
+							case_flag <= 1'b0;
+							
+						if(repeat_delay == 1'b1)begin//turns off seven segment after new key press after bottom line displayed
+							repeat_delay <= 1'b0;
+							repeat_count <= 7'b0;
+						end
+						
+						if (data_counter < 4'd15) begin
+							
+							if(flag == 1'b1 ) begin
+								data_counter <= data_counter + 2'd1;
+								caps_check[data_counter+1] <= case_flag;//stores position of each capital letter
+							end
+						end else begin
+							state <= S_LCD_ISSUE_CHANGE_LINE;//changes line from top to bottom
+							mode <= 1'b1;//flag so code knows that bottom line needs to be printed now
+							flag <= 1'b0;
+						end
+						if (data_counter == 1'b0 && flag == 1'b0) begin
+								state <= S_LCD_WAIT_ROM_UPDATE;//prints first letter on the top row
+								top_line <= PS2_code;
+								display <= PS2_code;//what character currently needs to be displayed
+								flag <= 1'b1;//flag to tell circuit first letter has already been displayed on top and not to display any more on top
+						end else begin
+						// Load the PS2 code to shift registers
+							data_reg[15] <= data_reg[14];
+							data_reg[14] <= data_reg[13];
+							data_reg[13] <= data_reg[12];
+							data_reg[12] <= data_reg[11];
+							data_reg[11] <= data_reg[10];
+							data_reg[10] <= data_reg[9];
+							data_reg[9] <= data_reg[8];
+							data_reg[8] <= data_reg[7];
+							data_reg[7] <= data_reg[6];
+							data_reg[6] <= data_reg[5];
+							data_reg[5] <= data_reg[4];
+							data_reg[4] <= data_reg[3];
+							data_reg[3] <= data_reg[2];
+							data_reg[2] <= data_reg[1];
+							data_reg[1] <= data_reg[0];
+							data_reg[0] <= PS2_code;
+						end
 					end
-					
-					// Load the PS2 code to shift registers
-					data_reg[15] <= data_reg[14];
-					data_reg[14] <= data_reg[13];
-					data_reg[13] <= data_reg[12];
-					data_reg[12] <= data_reg[11];
-					data_reg[11] <= data_reg[10];
-					data_reg[10] <= data_reg[9];
-					data_reg[9] <= data_reg[8];
-					data_reg[8] <= data_reg[7];
-					data_reg[7] <= data_reg[6];
-					data_reg[6] <= data_reg[5];
-					data_reg[5] <= data_reg[4];
-					data_reg[4] <= data_reg[3];
-					data_reg[3] <= data_reg[2];
-					data_reg[2] <= data_reg[1];
-					data_reg[1] <= data_reg[0];
-					data_reg[0] <= PS2_code;
-					
-
 				end
 			end
 		end
@@ -238,29 +282,44 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 			// Load translated LCD code to LCD instruction from the ROM
 			LCD_instruction <= {1'b1, LCD_code};
 			LCD_start <= 1'b1;
-			state <= S_LCD_FINISH_INSTRUCTION;
+			
+			if(mode == 1'b0 && last_letter == 1'b0) begin
+				state <= S_IDLE;//if mode is 0, returns to idle after printing first character on top row 
+			end else if(last_letter == 1'b1) begin
+				state <= S_DELAY;//only triggers after bottom row is displayed, adds delay to allow instructions to finish
+				last_letter <= 1'b0;
+			end else
+				state <= S_LCD_FINISH_INSTRUCTION;
 		end
 		S_LCD_FINISH_INSTRUCTION: begin
 			if (LCD_start == 1'b1) begin
 				LCD_start <= 1'b0;
 			end else begin	
-				if (LCD_done == 1'b1) begin			
+				if (LCD_done == 1'b1) begin	
+					
 					if (LCD_position < 4'd15) begin
+						
 						LCD_position <= LCD_position + 4'h1;
 						if (data_counter < 4'd15) begin
+						
 							data_counter <= data_counter + 2'd1;
-
+							
 							state <= S_LCD_WAIT_ROM_UPDATE;
 						end else begin
 							data_counter <= 2'd0;						
-
+							
 							state <= S_IDLE;
 						end
 					end else begin
-						// Need to change to line 2 for LCD
+						// Need to change to line 1 for LCD
 						LCD_position <= 4'h0;
-						state <= S_LCD_ISSUE_CHANGE_LINE;
+						state <= S_LCD_WAIT_ROM_UPDATE;//displyas 16th character on LCD
+						mode <= 1'b0;
+						caps_check <= 15'b0;
+						repeat_delay <= 1'b1;//flag to make sure first character after bottom line displayed gets a repeat check
+						last_letter <= 1'b1;//flag to enure state transitions to delay state after last character displayed
 					end
+					display <= data_reg[15];
 					data_reg[15] <= data_reg[14];
 					data_reg[14] <= data_reg[13];
 					data_reg[13] <= data_reg[12];
@@ -276,13 +335,28 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 					data_reg[3] <= data_reg[2];
 					data_reg[2] <= data_reg[1];
 					data_reg[1] <= data_reg[0];
-					data_reg[0] <= 8'h00;					
+					data_reg[0] <= 8'h00;		
+					
+					if(data_reg[15] == top_line)//checks if character in top line is repeated
+						repeat_count <= repeat_count + 1'b1;
+					
+					address <=  {caps_check[data_counter], data_reg[15]};//keeps track of current address in rom, for debugging purposes only 
 				end
+			end
+		end
+		S_DELAY: begin//50Mhz*1us delay = 50 cycles 
+			if (LCD_start == 1'b1) begin
+				LCD_start <= 1'b0;
+			end else if(delay_counter < 7'd50) 
+				delay_counter <= delay_counter + 1'b1;
+			else begin
+				delay_counter <= 1'b0;
+				state <= S_LCD_ISSUE_CHANGE_LINE;
 			end
 		end
 		S_LCD_ISSUE_CHANGE_LINE: begin
 			// Change line
-			LCD_instruction <= {2'b01, ~LCD_line, 6'h00};
+			LCD_instruction <= {2'b01, ~LCD_line, 6'h00}; 
 			LCD_line <= ~LCD_line;
 			LCD_start <= 1'b1;
 			state <= S_LCD_FINISH_CHANGE_LINE;
@@ -292,6 +366,7 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 				LCD_start <= 1'b0;
 			end else begin	
 				if (LCD_done == 1'b1) begin	
+					
 					if (data_counter < 4'd15) begin
 						data_counter <= data_counter + 2'd1;
 							
@@ -299,8 +374,12 @@ always_ff @ (posedge CLOCK_50_I or negedge resetn) begin
 					end else begin
 						// finish displaying
 						data_counter <= 2'd0;
+						if(mode == 1'b1)begin
+							state <= S_LCD_FINISH_INSTRUCTION;//go straight to finish instruction if line is being changed from top to bottom
+							
+						end else
 						
-						state <= S_IDLE;
+						state <= S_IDLE;//returns to idle if line changed from bottom to top
 					end
 				end
 			end
@@ -332,21 +411,26 @@ convert_hex_to_seven_segment unit2 (
 	.converted_value(value_7_segment[2])
 );
 
-convert_hex_to_seven_segment unit1 (
-	.hex_value(LCD_code[7:4]), 
-	.converted_value(value_7_segment[1])
-);
 
 convert_hex_to_seven_segment unit0 (
-	.hex_value(LCD_code[3:0]), 
+	.hex_value(repeat_count[3:0]), 
 	.converted_value(value_7_segment[0])
 );
 
-assign	SEVEN_SEGMENT_N_O[0] = value_7_segment[0],
-		SEVEN_SEGMENT_N_O[1] = value_7_segment[1],
+always_comb begin
+	if(repeat_delay == 1'b1)begin//keeps track of whether 7-segment needs to be off or displaying
+		seven_seg <= value_7_segment[0];
+	end else begin
+		seven_seg <= 7'h7f;
+	end
+end
+
+assign
+		SEVEN_SEGMENT_N_O[0] = seven_seg,
+		SEVEN_SEGMENT_N_O[1] = 7'h7f,
 		SEVEN_SEGMENT_N_O[2] = 7'h7f,
 		SEVEN_SEGMENT_N_O[3] = 7'h7f,
-		SEVEN_SEGMENT_N_O[4] = value_7_segment[2],
+		SEVEN_SEGMENT_N_O[4] = 7'h7f,
 		SEVEN_SEGMENT_N_O[5] = 7'h7f,
 		SEVEN_SEGMENT_N_O[6] = 7'h7f,
 		SEVEN_SEGMENT_N_O[7] = 7'h7f;
