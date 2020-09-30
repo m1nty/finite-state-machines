@@ -13,6 +13,7 @@
 -- refer to the applicable agreement for further details, at
 -- https://fpgasoftware.intel.com/eula.
 
+-- Quartus Prime generated Memory Initialization File (.mif)
 
 WIDTH=8;
 DEPTH=512;
@@ -91,6 +92,40 @@ CONTENT BEGIN
 	07B  :   2D;
 	07C  :   2A;
 	07D  :   39;
-	[07E..1FF]  :   FF;
+	[07E..114]  :   FF;
+	115  :   51;
+	[116..119]  :   FF;
+	11A  :   5A;
+	11B  :   53;
+	11C  :   41;
+	11D  :   57;
+	[11E..120]  :   FF;
+	121  :   43;
+	122  :   58;
+	123  :   44;
+	124  :   45;
+	[125..129]  :   FF;
+	12A  :   56;
+	12B  :   46;
+	12C  :   54;
+	12D  :   52;
+	[12E..130]  :   FF;
+	131  :   4E;
+	132  :   42;
+	133  :   48;
+	134  :   47;
+	135  :   59;
+	[136..139]  :   FF;
+	13A  :   4D;
+	13B  :   4A;
+	13C  :   55;
+	[13D..141]  :   FF;
+	142  :   4B;
+	143  :   49;
+	144  :   4F;
+	[145..14A]  :   FF;
+	14B  :   4C;
+	14C  :   FF;
+	14D  :   50;
+	[14E..1FF]  :   FF;
 END;
-
